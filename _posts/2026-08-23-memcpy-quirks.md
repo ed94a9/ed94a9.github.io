@@ -1,13 +1,11 @@
 ---
-title: The `memcpy` Quirks
+title: std::memcpy is Not The Fastest Function For it's Purpose
 date: 2026-08-23 18:21:00 +0800
 categories: [Systems, C++]
 tags: [c++, linux]
 ---
 
-# The `memcpy` Quirks
-
-`std::memcpy` is wildly optimized function in libc implementations as it is one of the most fundamental operations on a chunk of computer memory. If you open up the glibc's implementation of it. You can see lots of hand-written intrinsics/assemblies that takes advantages of modern computer data-level parallelism to speed up the operations. Although there are other implementations out there claiming to be faster than glibc [rte_memcpy](https://www.intel.com/content/www/us/en/developer/articles/technical/performance-optimization-of-memcpy-in-dpdk.html), it is not the topic of this blog. In this blog, I am going to talk about some nuances about the speed/performance aspect of calling `std::memcpy`, especially when the payload is actually small.
+`std::memcpy` is a highly optimized function in libc implementations as it is one of the most fundamental operations on a chunk of computer memory. If you open up the glibc's implementation of it. You can see lots of hand-written intrinsics/assemblies that takes advantages of modern computer data-level parallelism to speed up the operations. Although there are other implementations out there claiming to be faster than glibc [rte_memcpy](https://www.intel.com/content/www/us/en/developer/articles/technical/performance-optimization-of-memcpy-in-dpdk.html), it is not the topic of this blog. In this blog, I am going to talk about some nuances about the speed/performance aspect of calling `std::memcpy`, especially when the payload is actually small.
 
 Let me put the conclusion upfront here: `std::memcpy` is not as fast as you think when it comes to small buffer copy. You probably want to avoid it when it's in latency-critical cases.
 
@@ -26,5 +24,10 @@ After some profiling, it seems like that a naive look up using some best hashmap
 
 ## The Perfect Hash
 
-Perfect hash is the first thing that comes to my mind. It is a technique that aims to produce a collision-free hash function for a given set of elements upfront, for different kinds of reasons, accelerating hashmap look up being one of them.
+Perfect hash is the first thing that comes to my mind. It is a technique that aims to produce a collision-free hash function for a given set of elements upfront, for different kinds of reasons, accelerating hashmap look up being one of them. But this won't fit in our system because the full set of the available tickers on the market varies from day to day. We simply cannot afford to generate a perfect hash everyday and re-compile or re-link it to the trading binary. It's too much an operation burden and a very dangerous one -- If some day you recompile pipeline breaks or you forget to do it. You'll be facing with undefined behavior for certain. At that time, a crash is the best you can hope for. And you will be left with little clue how the system went off its track.
+
+
+## The memcpy
+
+Ok, well, I see, perfect has is not an option. So maybe a `memcpy` of the ticker to a 64-bit unsigned integer would be great idea ? After all, you can't go faster than `memcpy` right ?
 

@@ -1,5 +1,5 @@
 ---
-title: std::memcpy is Not The Fastest Function For it's Purpose
+title: std::memcpy is Not Always The Fastest Function For it's Purpose
 date: 2026-08-23 18:21:00 +0800
 categories: [Systems, C++]
 tags: [c++, linux]
@@ -14,20 +14,43 @@ Let me put the conclusion upfront here: `std::memcpy` is not as fast as you thin
 I have been working in the quantitative finance industry, where system latency is sometimes the key that can decide whether you lose money or win money. My work have been continuously finding opportunities to accelerate the trading pipeline. The other day my attention was drawn to a very specific part of the system: The ticker. A ticker is just a string of a tradable instrument in the market and the literal characters are embedded in the market feeds. It's a semi-regular string in the sense that we know:
 
   1. The tickers cannot be outside of the full universe that day on the market.
-  2. The tickers will not be very long: smaller than 16 characters, and most of the time, smaller than 8 characters.
+  2. The tickers will not be very long: up to 8 characters in length.
   3. It's all in printable characters.
 
-On the arrival of a piece of market data. The system will firstly assign a number (id) to the ticker so we don't have to use the string representation of the ticker everywhere in the system as that will be very slow in some cases like when you are maintaining a hashmap using the ticker string as the key. This handle has always been in the system. But it still cannot avoid 1 hashmap-like look up for tickers in the string form at the time when we try to assign the id to it -- after all, we need to know if the ticker in string has already been seen by the system.
+On the arrival of a piece of market data. The system will firstly assign a number (id) to the ticker so we don't have to use the string representation of the ticker everywhere in the system as that will be very slow in some cases like when you are maintaining a hashmap using the ticker string as the key. This handle has always been in the system. The implementation was always beging maintiaining a string-to-integer hashmap. We thought that one hashmap was unavoidable and minimizing the number of string-keyed hashmaps to this essential one was the best we can do.
 
-After some profiling, it seems like that a naive look up using some best hashmap implementation takes on the order of **50 ns**, which does not sound quite a log, but it is a lot in a high frequency trading system. So here comes the question: Is there a way to optimize the has function of a ticker in string to accelerate the process. After all, it seems like 50 nanoseconds is way over the limit of this thing.
+But after some profiling, we were still not happy with it -- one update on that hashmap along is measured to take ~**50 ns**, which does not sound quite a lot, but it is a lot in the world of high frequency trading.
+
+Then there was an idea floating around in the team: Can we entirely remove that hashmap ? To put it another way, that is to come up with a scheme to assign each ticker an unique integer with the guarantee of: 1. No collision within the set; 2. No usage of hashmap.
+
+Of cause we can!
+
+## Pre-computed Perfect Hash
+
+Perfect hash is the first thing that comes to my mind. It is a technique that aims to produce a collision-free hash function for a given set of elements upfront, for different kinds of reasons, accelerating hashmap look up being one of them since collision can lead to severer degradation of hash map performance. But this won't fit in our system because the full set of the available tickers on the market varies from day to day. We simply cannot afford to generate a perfect hash everyday and re-compile or re-link it to the trading binary. It's too much an operation burden and a very dangerous one -- If some day you recompile pipeline breaks or you forget to do it. You'll be facing with undefined behavior for certain. At that time, a crash is the best you can hope for. And you will be left with little clue how the system went off its track.
 
 
-## The Perfect Hash
+## `memcpy`
 
-Perfect hash is the first thing that comes to my mind. It is a technique that aims to produce a collision-free hash function for a given set of elements upfront, for different kinds of reasons, accelerating hashmap look up being one of them. But this won't fit in our system because the full set of the available tickers on the market varies from day to day. We simply cannot afford to generate a perfect hash everyday and re-compile or re-link it to the trading binary. It's too much an operation burden and a very dangerous one -- If some day you recompile pipeline breaks or you forget to do it. You'll be facing with undefined behavior for certain. At that time, a crash is the best you can hope for. And you will be left with little clue how the system went off its track.
+Ok, I see, perfect has is not an option. So maybe a `memcpy` of the ticker to a 64-bit unsigned integer would be great idea ? After all, you can't go faster than `memcpy` right ? A `mmecpy` will also guarantee the hash values will be collision-free.
 
+Then I was immediately off to an experiment with the `memcpy`:
 
-## The memcpy
+```cpp
+std::unit64_t int_rep_1( const Ticker& ticker) // Ticker is an wrapper object of the actual char* representaion of the ticker.
+					       //    With the same interface of std::string
+{
+    std::uint64_t res{};
+    std::memcpy( ticker.data(), &res, ticker.size() );
+    return res; 			       // Should definitely have NRVO
+}
+```
 
-Ok, well, I see, perfect has is not an option. So maybe a `memcpy` of the ticker to a 64-bit unsigned integer would be great idea ? After all, you can't go faster than `memcpy` right ?
+After some benchmarking, this function takes 20+ ns on our machine, which is much better than 50 in the old system. Problem solved, isn't it ? You can out perform the memcpy by quite a lot can you ? But then I also took a measurement on the latency of `std::hash<std::string>::operator()` -- It was 5 ns, 1/4 of what `std::memcpy` gives.
+
+That was a suprise to me. I've always thought `std::memcpy` is heavily optimized, and in this case, you have to touch all of that ticker's bytes in memory, then how can you be even faster than simply copying that memory blob into the return value register ?
+
+## The Disassembly
+
+After disassemblying the function. Things 
 

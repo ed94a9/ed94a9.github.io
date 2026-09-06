@@ -30,7 +30,7 @@ Of cause we can!
 Perfect hash is the first thing that comes to my mind. It is a technique that aims to produce a collision-free hash function for a given set of elements upfront, for different kinds of reasons, accelerating hashmap look up being one of them since collision can lead to severer degradation of hash map performance. But this won't fit in our system because the full set of the available tickers on the market varies from day to day. We simply cannot afford to generate a perfect hash everyday and re-compile or re-link it to the trading binary. It's too much an operation burden and a very dangerous one -- If some day you recompile pipeline breaks or you forget to do it. You'll be facing with undefined behavior for certain. At that time, a crash is the best you can hope for. And you will be left with little clue how the system went off its track.
 
 
-## `memcpy`
+## memcpy
 
 Ok, I see, perfect has is not an option. So maybe a `memcpy` of the ticker to a 64-bit unsigned integer would be great idea ? After all, you can't go faster than `memcpy` right ? A `mmecpy` will also guarantee the hash values will be collision-free.
 

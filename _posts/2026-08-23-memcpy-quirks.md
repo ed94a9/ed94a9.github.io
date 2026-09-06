@@ -41,7 +41,7 @@ std::unit64_t int_rep_1( const Ticker& ticker) // Ticker is an wrapper object of
 					       //    With the same interface of std::string
 {
     std::uint64_t res{};
-    std::memcpy( ticker.data(), &res, ticker.size() );
+    std::memcpy( &res, ticker.data(), ticker.size() );
     return res; 			       // Should definitely have NRVO
 }
 ```
@@ -57,5 +57,20 @@ After disassemblying the function. Things was a bit clearer: **The call to std::
 ## The Modern Feature
 
 After some digging. It appears that the compiler will resist to inline the `std::memcpy` function call for you when it has no idea how long the memory blob you are going to copy because it has no idea if it will be good or bad to the performance.
+
+Then something caught my eyes: a new feature in C++20, the `assume` annotation, with the syntax in the form of `[[assume(/*The annotations you would like to add*/)]];`. I have not used this feature before. But this seems like a legit, genuine place for it. So then then I put up an annotation in the function:
+
+```cpp
+std::unit64_t int_rep_1( const Ticker& ticker) // Ticker is an wrapper object of the actual char* representaion of the ticker.
+					       //    With the same interface of std::string
+{
+    [[assume(ticker.size() <= 8 )]];
+    [[assume(ticker.size() >= 1 )]];
+    std::uint64_t res{};
+    std::memcpy( &res, ticker.data(), ticker.size() );
+    return res; 			       // Should definitely have NRVO
+}
+```
+
 
 

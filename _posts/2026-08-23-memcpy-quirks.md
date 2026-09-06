@@ -17,7 +17,7 @@ I have been working in the quantitative finance industry, where system latency i
   2. The tickers will not be very long: up to 8 characters in length.
   3. It's all in printable characters.
 
-On the arrival of a piece of market data. The system will firstly assign a number (id) to the ticker so we don't have to use the string representation of the ticker everywhere in the system as that will be very slow in some cases like when you are maintaining a hashmap using the ticker string as the key. This handle has always been in the system. The implementation was always beging maintiaining a string-to-integer hashmap. We thought that one hashmap was unavoidable and minimizing the number of string-keyed hashmaps to this essential one was the best we can do.
+On the arrival of a piece of market data. The system will firstly assign a number (id) to the ticker so we don't have to use the string representation of the ticker everywhere in the system as that will be very slow in some cases like when you are maintaining a hashmap using the ticker string as the key. This handle has always been in the system. The implementation was always relying on maintaining a string-to-integer hashmap. We thought that one hashmap was unavoidable and minimizing the number of string-keyed hashmaps to this essential one was the best we can do.
 
 But after some profiling, we were still not happy with it -- one update on that hashmap along is measured to take ~**50 ns**, which does not sound quite a lot, but it is a lot in the world of high frequency trading.
 
@@ -38,11 +38,11 @@ Then I was immediately off to an experiment with the `memcpy`:
 
 ```cpp
 std::unit64_t int_rep_1( const Ticker& ticker) // Ticker is an wrapper object of the actual char* representaion of the ticker.
-					       //    With the same interface of std::string
+                                               //    With the same interface of std::string
 {
-    std::uint64_t res{};
-    std::memcpy( &res, ticker.data(), ticker.size() );
-    return res; 			       // Should definitely have NRVO
+  std::uint64_t res{};
+  std::memcpy( &res, ticker.data(), ticker.size() );
+  return res; 			       // Should definitely have NRVO
 }
 ```
 
@@ -61,16 +61,50 @@ After some digging. It appears that the compiler will resist to inline the `std:
 Then something caught my eyes: a new feature in C++20, the `assume` annotation, with the syntax in the form of `[[assume(/*The annotations you would like to add*/)]];`. I have not used this feature before. But this seems like a legit, genuine place for it. So then then I put up an annotation in the function:
 
 ```cpp
-std::unit64_t int_rep_1( const Ticker& ticker) // Ticker is an wrapper object of the actual char* representaion of the ticker.
-					       //    With the same interface of std::string
+std::uint64_t int_rep_2( const Ticker& ticker) // Ticker is an wrapper object of the actual char* representaion of the ticker.
+                                               //    With the same interface of std::string
 {
-    [[assume(ticker.size() <= 8 )]];
-    [[assume(ticker.size() >= 1 )]];
-    std::uint64_t res{};
-    std::memcpy( &res, ticker.data(), ticker.size() );
-    return res; 			       // Should definitely have NRVO
+  std::uint64_t res{};
+  const std::size_t cpy_size = ticker.size();
+  [[assume(cpy_size <= 8)]];                 // Added assumption
+  [[assume(cpy_size >= 1)]];                 // Added assumption
+  std::memcpy( &res, ticker.data(), cpy_size );
+  return res;
 }
 ```
 
+Adding the two assumption lines makes the indirect call of `memcpy` disappear in the disassembly. Here is the proof: `https://godbolt.org/z/j8f48K7sP` . The new assumption annotation works!
+
+Albeit, the result is still a little discouraging: The latency of the new function is not improving. The reason is also simple: Although the function call indirection disappears, too many codes are inlined, putting a lot of L cache pressure in the hot path, which is not necessary.
+
+## The Simple Solution
+
+So seems like the `std::mmecpy` is simply a too heavy tool in this scenario. So, many a very simple solution can save us ?
+
+```cpp
+std::uint64_t int_rep_3( const Ticker& ticker )
+{
+  switch ( ticker.size() ) {
+    case 1:
+      return static_cast<std::uint64_t>( ticker[0] );
+    case 2:
+      return (static_cast<std::uint64_t>( ticker[0] ) << 7) + static_case<std::uint64_t>( ticker[1] );
+    case 3:
+      return (static_cast<std::uint64_t>( ticker[0] ) << 14) + ( static_case<std::uint64_t>( ticker[1] << 7 ) + static_case<std::uint64_t>( ticker[1];
+    // ... until 8
+    default:
+      throw std::runtime_error("Invalid ticker!");
+  }
+}
+```
+
+This very simple (almost) re-implementation of memcpy gives us something almost identical to the `std::hash` in terms of the latency. Which is very ideal. 
+
+## Lessons
+
+Some simple lessons:
+
+- `std::memcpy` is not your best choice when you are dealing with small buffers. You will either face with function call indirections or high instruction cache pressure. There also seems to implementations claim to beat `std::memcpy` in general cases in speed, such as (DPDK)[[https://github.com/DPDK/dpdk]];
+- `[[assume()]];` annotation works, which is almost like magic;
 
 

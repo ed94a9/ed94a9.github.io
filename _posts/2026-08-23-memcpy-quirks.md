@@ -52,5 +52,10 @@ That was a suprise to me. I've always thought `std::memcpy` is heavily optimized
 
 ## The Disassembly
 
-After disassemblying the function. Things 
+After disassemblying the function. Things was a bit clearer: **The call to std::memcpy was not inlined**. That clears the mist: By using `std::memcpy`, we introduced an unwanted function call indirection in the code.
+
+## The Modern Feature
+
+After some digging. It appears that the compiler will resist to inline the `std::memcpy` function call for you when it has no idea how long the memory blob you are going to copy because it has no idea if it will be good or bad to the performance.
+
 

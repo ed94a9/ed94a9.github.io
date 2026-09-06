@@ -104,7 +104,7 @@ This very simple (almost) re-implementation of memcpy gives us something almost 
 
 Some simple lessons:
 
-- `std::memcpy` is not your best choice when you are dealing with small buffers. You will either face with function call indirections or high instruction cache pressure. There also seems to implementations claim to beat `std::memcpy` in general cases in speed, such as (DPDK)[[https://github.com/DPDK/dpdk]];
+- `std::memcpy` is not your best choice when you are dealing with small buffers. You will either face with function call indirections or high instruction cache pressure. There also seems to implementations claim to beat `std::memcpy` in general cases in speed, such as [DPDK](https://github.com/DPDK/dpdk);
 - `[[assume()]];` annotation works, which is almost like magic;
 
 

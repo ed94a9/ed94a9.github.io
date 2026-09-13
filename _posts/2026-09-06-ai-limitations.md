@@ -21,7 +21,7 @@ An agent is capable of a lot of things. But maybe this fact can bite you. Becaus
 
 You can ask your agent for a big favor, something like "Create me an absolutely gorgeous website". And it really does yield a pretty one for your in 10 minutes. You think case closed. But if you are not an experienced engineer, you won't know that there are quite some more stuff to test/consider about before your site go live. e.g., Does it work equally nicely on mobile devices ? Maybe the website is dynamic and you are not going to be able to host it on github sites. Or maybe your agent has used some framework that's going to charge you for commercial usage and you haven't considered about it. The list goes on and on. It's not that the agent can't help you solve these problems, it's that you don't even realize you have so many problems to solve in association with your real goal.
 
-## Securities
+## Security
 
 AI agents are becoming more and more intelligent and clever and it has come to a point that an innocent agent, given enough permission can cost you a lot. And securities are becoming more and more of a concern for engineers. I can foresee that in the near future that the whole software engineer will lean more towards safety/security. And permission control will be much of a topic than it is now.
 

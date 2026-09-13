@@ -2,7 +2,7 @@
 title: std::memcpy is Not Always The Fastest Function For it's Purpose
 date: 2026-08-23 18:21:00 +0800
 categories: [Systems, C++]
-tags: [c++, linux]
+tags: [C++, Linux]
 ---
 
 `std::memcpy` is a highly optimized function in libc implementations as it is one of the most fundamental operations on a chunk of computer memory. If you open up the glibc's implementation of it. You can see lots of hand-written intrinsics/assemblies that takes advantages of modern computer data-level parallelism to speed up the operations. Although there are other implementations out there claiming to be faster than glibc [rte_memcpy](https://www.intel.com/content/www/us/en/developer/articles/technical/performance-optimization-of-memcpy-in-dpdk.html), it is not the topic of this blog. In this blog, I am going to talk about some nuances about the speed/performance aspect of calling `std::memcpy`, especially when the payload is actually small.

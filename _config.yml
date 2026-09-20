@@ -14,7 +14,7 @@ timezone: "Asia/Hong_Kong"
 # jekyll-seo-tag settings › https://github.com/jekyll/jekyll-seo-tag/blob/master/docs/usage.md
 # ↓ --------------------------
 
-title: My Technical Blogs # the main title
+title: Eddie's Technical Blogs # the main title
 
 tagline: Thoughts and learns about C++/Python/Porgramming/AI and all that.
 
